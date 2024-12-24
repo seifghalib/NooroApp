@@ -22,7 +22,7 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "OPENWEATHER_API_KEY", "\"1bc39c5ca8c9a358cbf94520436f6223\"");
+        buildConfigField("String", "OPENWEATHER_API_KEY", "\"d199774e8a79461784b21342242312\"");
     }
 
     buildTypes {

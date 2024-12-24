@@ -1,6 +1,6 @@
 package com.example.nooro.di
 
-import com.example.nooro.api.OpenWeatherApi
+import com.example.nooro.api.WeatherApi
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -17,12 +17,12 @@ object AppModule {
     @Singleton
     fun provideRetrofit(): Retrofit =
         Retrofit.Builder()
-            .baseUrl(OpenWeatherApi.BASE_URL)
+            .baseUrl(WeatherApi.BASE_URL)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
 
     @Provides
     @Singleton
-    fun provideRandomUserApi(retrofit : Retrofit): OpenWeatherApi =
-        retrofit.create(OpenWeatherApi::class.java)
+    fun provideRandomUserApi(retrofit : Retrofit): WeatherApi =
+        retrofit.create(WeatherApi::class.java)
 }

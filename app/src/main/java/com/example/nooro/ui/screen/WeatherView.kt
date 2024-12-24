@@ -1,6 +1,8 @@
 package com.example.nooro.ui.screen
 
+import android.content.SharedPreferences
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
@@ -28,67 +31,89 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.content.edit
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.annotation.ExperimentalCoilApi
 import coil.compose.rememberImagePainter
 import com.example.nooro.R
-import com.example.nooro.api.OpenWeatherApi
-import com.example.nooro.data.WeatherResponse
-import com.example.nooro.ui.theme.NooroTheme
+import com.example.nooro.data.ApiResponse
+import com.example.nooro.data.Current
+import com.example.nooro.ui.viewmodels.HomeViewModel
 import com.example.nooro.utils.ApiState
 import kotlinx.coroutines.flow.StateFlow
 import kotlin.math.roundToInt
 
+
+const val SHARED_PREF_NAME = "WeatherSharedPref"
+const val CITY_KEY = "queried_City_Key"
+
 @Composable
 fun WeatherView(
     modifier: Modifier = Modifier,
-    results: StateFlow<ApiState<WeatherResponse>>
+    results: StateFlow<ApiState<ApiResponse>>
 ) {
-    val response by results.collectAsStateWithLifecycle()
-    val state = response
+    val apiResponse by results.collectAsStateWithLifecycle()
+    val state = apiResponse
 
     Column(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+
         when (state) {
-            is ApiState.Failure -> {}
+            is ApiState.Failure -> {
+
+                val errMsg = when {
+                    state.msg.contains("1006") -> "Invalid City"
+                    state.msg.contains("hostname") -> "No Network"
+                    else -> state.msg
+                }
+                Text(
+                    text = errMsg,
+                    modifier = modifier,
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Black,
+                    textAlign = TextAlign.Center
+                )
+            }
+
             is ApiState.Loading -> {
                 CircularProgressIndicator()
             }
 
             is ApiState.Success -> {
+                state.data.let { response ->
+                    response.current?.let {
+                        it.condition?.let { condition ->
+                            WeatherImage(url = condition.icon ?: "")
+                            Text(
+                                text = condition.text ?: "",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Normal
+                            )
+                            Spacer(modifier = Modifier.height(15.dp))
+                        }
 
-                val cityName = state.data.name
-                val currentTemp = "${state.data.main.temp.roundToInt()} \u2109"
-                val weather = state.data.weather.firstNotNullOfOrNull { it }
+                        Text(
+                            text = response.location?.name ?: "",
+                            style = MaterialTheme.typography.displayMedium,
+                            fontWeight = FontWeight.Medium
+                        )
 
-                weather?.let {
-                    WeatherImage(
-                        modifier = modifier,
-                        url = it.icon
-                    )
+                        Text(
+                            text = "${it.tempC?.roundToInt()} \u2103",
+                            style = MaterialTheme.typography.displayLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        WeatherCard(it)
+                    }
                 }
+            }
 
-                Text(
-                    text = cityName,
-                    modifier = modifier,
-                    style = MaterialTheme.typography.displayMedium,
-                    fontWeight = FontWeight.Medium
-                )
-
-                Text(
-                    text = currentTemp,
-                    modifier = modifier,
-                    style = MaterialTheme.typography.displayLarge,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(15.dp))
-
-                WeatherCard("")
+            ApiState.EmptyState -> {
+                EmptyView()
             }
         }
     }
@@ -96,44 +121,60 @@ fun WeatherView(
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
-fun SearchTopBar() {
-    var text by remember { mutableStateOf("") }
-    var active by remember { mutableStateOf(false) }
+fun SearchTopBar(
+    viewModel: HomeViewModel,
+    sharedPreferences: SharedPreferences
+) {
+
+    var query by remember { mutableStateOf("") }
+    var isOpen by remember { mutableStateOf(false) }
+
+    val onSearchCallBack: (String) -> Unit = {
+        isOpen = false
+        viewModel.onTextChange(query)
+        sharedPreferences.edit {
+            putString(CITY_KEY, query)
+        }
+        query = ""
+    }
+
     SearchBar(
         modifier = Modifier
             .fillMaxWidth()
             .padding(8.dp),
-        query = text,
+        query = query,
         onQueryChange = {
-            text = it
+            query = it
         },
-        onSearch = {
-            active = false
-        },
-        active = active,
+        onSearch = onSearchCallBack,
+        active = isOpen,
         onActiveChange = {
-            active = it
+            isOpen = it
         },
         placeholder = {
-            Text("Seach Location")
+            Text("Search Location")
         },
         trailingIcon = {
-            Icon(imageVector = Icons.Default.Search, contentDescription = "")
-        }
-    ) {
-
-    }
+            Icon(
+                modifier = Modifier.clickable {
+                    if (isOpen)
+                        onSearchCallBack(query)
+                },
+                imageVector = Icons.Default.Search,
+                contentDescription = "Search Icon"
+            )
+        },
+        shape = RoundedCornerShape(14.dp)
+    ) {}
 }
 
 @OptIn(ExperimentalCoilApi::class)
 @Composable
 fun WeatherImage(
-    modifier: Modifier = Modifier,
     url: String
 ) {
-    val iconURL = OpenWeatherApi.ICON_URL.format(url)
     val painter = rememberImagePainter(
-        data = iconURL,
+        data = "https:$url",
         builder = {
             placeholder(R.drawable.ic_loader)
             error(R.drawable.ic_error_24)
@@ -152,35 +193,14 @@ fun WeatherImage(
 
 @Composable
 fun WeatherCard(
-    url: String
+    current: Current
 ) {
     Card(
         modifier = Modifier
             .padding(12.dp)
             .fillMaxWidth()
     ) {
-        Row(
-            modifier = Modifier.padding(8.dp),
-        ) {
-
-            Text(
-                modifier = Modifier.weight(1f),
-                text = "Humidity",
-                textAlign = TextAlign.Center
-            )
-
-            Text(
-                modifier = Modifier.weight(1f),
-                text = "UV",
-                textAlign = TextAlign.Center
-            )
-
-            Text(
-                modifier = Modifier.weight(1f),
-                text = "Feels Like",
-                textAlign = TextAlign.Center
-            )
-        }
+        CardHeader()
 
         Row(
             modifier = Modifier.padding(8.dp)
@@ -188,30 +208,48 @@ fun WeatherCard(
 
             Text(
                 modifier = Modifier.weight(1f),
-                text = "Humidity",
+                text = "${current.humidity} %",
                 textAlign = TextAlign.Center
             )
 
             Text(
                 modifier = Modifier.weight(1f),
-                text = "UV",
+                text = "${current.uv}",
                 textAlign = TextAlign.Center
             )
 
             Text(
                 modifier = Modifier.weight(1f),
-                text = "Feels Like",
+                text = "${current.feelslikeC?.roundToInt()} ℃",
                 textAlign = TextAlign.Center
             )
         }
     }
 }
 
-@Preview(showBackground = true)
 @Composable
-fun GreetingPreview() {
-    NooroTheme {
-        SearchTopBar()
+private fun CardHeader() {
+    Row(
+        modifier = Modifier.padding(8.dp),
+    ) {
+
+        Text(
+            modifier = Modifier.weight(1f),
+            text = "Humidity",
+            textAlign = TextAlign.Center
+        )
+
+        Text(
+            modifier = Modifier.weight(1f),
+            text = "UV",
+            textAlign = TextAlign.Center
+        )
+
+        Text(
+            modifier = Modifier.weight(1f),
+            text = "Feels Like",
+            textAlign = TextAlign.Center
+        )
     }
 }
 

@@ -45,10 +45,6 @@ data class Current(
     val pressureMb: Int? = null,
     @SerializedName("pressure_in")
     val pressureIn: Double? = null,
-    @SerializedName("precip_mm")
-    val precipMm: Int? = null,
-    @SerializedName("precip_in")
-    val precipIn: Int? = null,
     val humidity: Int? = null,
     val cloud: Int? = null,
     @SerializedName("feelslike_c")
@@ -63,15 +59,13 @@ data class Current(
     val heatindexC: Double? = null,
     @SerializedName("heatindex_f")
     val heatindexF: Double? = null,
-    @SerializedName("dewpoint_c")
-    val dewpointC: Int? = null,
     @SerializedName("dewpoint_f")
     val dewpointF: Double? = null,
     @SerializedName("vis_km") val
     visKm: Int? = null,
     @SerializedName("vis_miles")
     val visMiles: Int? = null,
-    val uv: Int? = null,
+    val uv: Double? = null,
     @SerializedName("gust_mph")
     val gustMph: Double? = null,
     @SerializedName("gust_kph")
